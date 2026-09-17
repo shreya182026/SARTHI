@@ -218,7 +218,7 @@ useEffect(() => {
     window.removeEventListener('online', handleOnline);
     window.removeEventListener('offline', handleOffline);
   };
-}, []);
+}, [journeyActive, livePos, battery]);
  useEffect(()=>{if(screen==='live'){if(battery<=40&&battery>20)toastMsg('40%: Low-Power Journey Mode prepared.'); if(battery===20)showLightBuzz('Battery is at 20%.'); if(battery===10)showLightBuzz('Battery has reached 10%.'); if(battery<=5)toastMsg('Critical Low Battery Mode — essential support only.')}},[battery,screen]);
  useEffect(()=>{if(profile.completed)write('sarthi-profile',profile)},[profile]);
  const showLightBuzz=(reason:string)=>{setBuzz('light');toastMsg(`LIGHT BUZZ to ${contacts.filter(c=>c.primary).length} primary contact${contacts.filter(c=>c.primary).length===1?'':'s'}: ${reason}`)};
