@@ -92,7 +92,7 @@ export default function App(){
  const [livePos,setLivePos]=useState<Coords|null>(location); const [journeyStep,setJourneyStep]=useState(0); const [battery,setBattery]=useState(74); const [connectivity,setConnectivity]=useState<'Normal'|'Unstable'|'Low connectivity'|'Offline'>('Normal');
  const [lastSync,setLastSync]=useState(new Date().toLocaleTimeString()); const [journeyActive,setJourneyActive]=useState(false); const [buzz,setBuzz]=useState<'none'|'light'|'tight'>('none'); const [demoPlaying,setDemoPlaying]=useState(false); const [stopState,setStopState]=useState<'moving'|'checking'|'escalated'>('moving');
  const [toast,setToast]=useState(''); const [connectivityLatency,setConnectivityLatency]=useState<number|null>(null);
-const connectivityNoticeRef=useRef<ConnectivityState|null>(null); const [reportText,setReportText]=useState(''); const [reportStatus,setReportStatus]=useState<'Under Review'|'Verified'|'Questionable'|'Outdated'>('Under Review'); const evidenceInputRef=useRef<HTMLInputElement|null>(null); const [evidencePhoto,setEvidencePhoto]=useState('');
+ const [reportText,setReportText]=useState(''); const [reportStatus,setReportStatus]=useState<'Under Review'|'Verified'|'Questionable'|'Outdated'>('Under Review'); const evidenceInputRef=useRef<HTMLInputElement|null>(null); const [evidencePhoto,setEvidencePhoto]=useState('');
  const [contacts,setContacts]=useState<Contact[]>(read<Contact[]>('sarthi-contacts',[]));
  const [contactsSetup,setContactsSetup]=useState(false);
  const [pointStatus,setPointStatus]=useState<'idle'|'loading'|'live'|'fallback'>('idle'); const [pointUpdatedAt,setPointUpdatedAt]=useState('');
