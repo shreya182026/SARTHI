@@ -526,7 +526,7 @@ try{
   }catch{}
 
   nav('live');
-};const capsule={startedAt:new Date().toISOString(),route:selected?.title||'Route 1',from,to,mode:selected?.modes||[selectedMode],geometry:selected?.geometry||[],steps:selected?.steps||[],checkpoints:visiblePoints.filter(m=>m.kind==='checkpoint'),helpPoints:visiblePoints.filter(m=>m.kind==='help'),destination:to,contacts,helpline,stateName,lastSync};setJourneyActive(true);setLivePos(c);setBattery(74);setConnectivity(navigator.onLine?'Normal':'Offline');setStopState('moving');write('sarthi-active',capsule);write('sarthi-journey-capsule',capsule);nav('live');};
+};
  const finishProfile=()=>{if(editingProfile){const p={...profileDraft,completed:true,phone};setProfile(p);write('sarthi-profile',p);setEditingProfile(false);toastMsg('Profile updated. Your usual travel style is saved.');goBack()}else{const p={...profileDraft,completed:false,phone,priorities:[]};setProfile(p);setPriorities([]);write('sarthi-profile',p);nav('onboarding-preferences')}};
  const finishOnboardingPreferences=()=>{if(priorities.length<6){toastMsg('Choose at least 6 priorities so I can understand what matters to you.');return}const p={...profile,priorities,completed:false};setProfile(p);write('sarthi-profile',p);setContactsSetup(true);nav('contacts')};
  const finishOnboarding=()=>{const p={...profile,completed:true};setProfile(p);write('sarthi-profile',p);historyRef.current=['home'];historyIndexRef.current=0;setScreen('home');window.scrollTo({top:0,behavior:'smooth'})};
