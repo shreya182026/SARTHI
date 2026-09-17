@@ -210,10 +210,80 @@ View the Sarthi journey screen for the full route and support context.`;window.l
  const searchPlaces=async(q:string)=>{setSearch(q);if(q.trim().length<2){setResults([]);return}setSearching(true);try{const r=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=7&countrycodes=in&addressdetails=1&q=${encodeURIComponent(q)}`,{headers:{Accept:'application/json'}});const d=await r.json();setResults(Array.isArray(d)?d:[])}catch{setResults(FALLBACK_PLACES.filter(x=>x.toLowerCase().includes(q.toLowerCase())).map(x=>({display_name:x,lat:String((location||{lat:28.6139}).lat),lon:String((location||{lng:77.209}).lng)})) as Place[])}finally{setSearching(false)}};
  const searchStartPlaces=async(q:string)=>{setStartSearch(q);if(q.trim().length<2){setStartResults([]);return}setSearchingStart(true);try{const r=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&countrycodes=in&addressdetails=1&q=${encodeURIComponent(q)}`,{headers:{Accept:'application/json'}});const d=await r.json();setStartResults(Array.isArray(d)?d:[])}catch{setStartResults(FALLBACK_PLACES.filter(x=>x.toLowerCase().includes(q.toLowerCase())).map(x=>({display_name:x,lat:String((location||{lat:28.6139}).lat),lon:String((location||{lng:77.209}).lng)})) as Place[])}finally{setSearchingStart(false)}};
  const selected=routes[selectedRoute] || null;
- const buildRoute=async()=>{if(!fromCoords||!toCoords){setRoutes(makeFallbackRoutes());nav('routes');return}setLoadingRoutes(true);try{const r=await fetch(`https://router.project-osrm.org/route/v1/driving/${fromCoords.lng},${fromCoords.lat};${toCoords.lng},${toCoords.lat}?overview=full&geometries=geojson&steps=true`);const j=await r.json();const base=j.routes?.[0];if(!base)throw new Error('no route');const geom=(base.geometry.coordinates as [number,number][]).map(([lng,lat])=>[lat,lng] as [number,number]);const dur=Math.round(base.duration/60);const dist=Number((base.distance/1000).toFixed(1));const rts:Route[]=[
- {id:'r1',title:'Route 1',duration:dur,cost:Math.max(25,Math.round(dist*12)),distance:dist,walking:Math.max(4,Math.round(dist*0.18)),transfers:1,modes:['Walk','Metro'],reason:'A balanced option based on your saved travel priorities.',context:'Live road geometry is available. Traffic is provider-dependent; current prototype context is simulated.',confidence:'High',updated:'Just now',firstMile:'5–8 min walk → transit',lastMile:'5–10 min walk → destination',steps:['Walk to the nearest transit point','Continue on the main transit leg','Follow the final walking segment'],geometry:geom,traffic:'Moderate'},
- {id:'r2',title:'Route 2',duration:Math.max(1,dur-6),cost:Math.max(45,Math.round(dist*16)),distance:dist*0.92,walking:Math.max(3,Math.round(dist*0.12)),transfers:1,modes:['Auto / Rickshaw','Metro'],reason:'Less walking with a slightly higher cost.',context:'Pickup/transport availability is simulated in this demo.',confidence:'Moderate',updated:'Just now',firstMile:'Auto pickup → Metro',lastMile:'Short walk → destination',steps:['Auto pickup','Metro leg','Short final walk'],geometry:geom,traffic:'Heavy'},
- {id:'r3',title:'Route 3',duration:Math.max(1,dur-2),cost:Math.max(120,Math.round(dist*40)),distance:dist*0.98,walking:2,transfers:0,modes:['Cab'],reason:'Direct option with minimal walking and no transfer.',context:'Provider/vehicle information requires a legitimate cab integration; this demo uses mock provider data.',confidence:'Limited',updated:'Just now',firstMile:'Cab pickup near start',lastMile:'Drop-off near destination',steps:['Cab pickup','Direct ride','Drop-off'],geometry:geom,traffic:'Light'}];setRoutes(rts);setSelectedRoute(0);nav('routes')}catch{setRoutes(makeFallbackRoutes());nav('routes')}finally{setLoadingRoutes(false)}};
+const buildRoute=async()=>{
+  if(!fromCoords||!toCoords){
+    setRoutes(makeFallbackRoutes());
+    nav('routes');
+    return;
+  }
+
+  setLoadingRoutes(true);
+
+  try{
+    const params=new URLSearchParams({
+      from:`${fromCoords.lat},${fromCoords.lng}`,
+      to:`${toCoords.lat},${toCoords.lng}`
+    });
+
+    const response=await fetch(`/api/route-intelligence?${params.toString()}`);
+
+    if(!response.ok){
+      throw new Error('Route backend unavailable');
+    }
+
+    const data=await response.json();
+
+    if(!data.success||!Array.isArray(data.routes)||!data.routes.length){
+      throw new Error('No routes returned');
+    }
+
+    const rts:Route[]=data.routes.map((route:any,index:number)=>{
+
+      const geometry:[number,number][]=
+        route.geometry?.coordinates?.map(
+          ([lng,lat]:[number,number])=>[lat,lng] as [number,number]
+        )||[];
+
+      const mode=index===0
+        ? ['Driving']
+        : ['Alternative driving'];
+
+      return {
+        id:`backend-${route.id||index+1}`,
+        title:`Route ${index+1}`,
+        duration:route.durationMin||0,
+        cost:route.estimatedCost||0,
+        distance:route.distanceKm||0,
+        walking:0,
+        transfers:0,
+        modes:mode,
+        reason:index===0
+          ? 'Real route calculated from your selected journey.'
+          : 'Alternative real road route returned by the routing service.',
+        context:'Route calculated using live OpenStreetMap/OSRM routing data.',
+        confidence:'High',
+        updated:'Just now',
+        firstMile:'Based on the selected starting point',
+        lastMile:'Based on the selected destination',
+        steps:(route.steps||[])
+          .slice(0,8)
+          .map((s:any)=>s.name||s.maneuver?.type||'Continue'),
+        geometry,
+        traffic:'Moderate'
+      };
+    });
+
+    setRoutes(rts);
+    setSelectedRoute(0);
+    nav('routes');
+
+  }catch{
+    setRoutes(makeFallbackRoutes());
+    nav('routes');
+  }finally{
+    setLoadingRoutes(false);
+  }
+};
  const makeFallbackRoutes=():Route[]=>{const c=fromCoords||location||{lat:28.6139,lng:77.209};const d=toCoords||{lat:c.lat+0.03,lng:c.lng+0.02};const geom: [number,number][]=[[c.lat,c.lng],[c.lat+(d.lat-c.lat)*.35,c.lng+(d.lng-c.lng)*.35],[c.lat+(d.lat-c.lat)*.7,c.lng+(d.lng-c.lng)*.7],[d.lat,d.lng]];return [
   {id:'r1',title:'Route 1',duration:32,cost:40,distance:9.2,walking:7,transfers:1,modes:['Walk','Metro'],reason:'Currently fits your saved priorities well.',context:'Demo road/transit context used because live routing is unavailable.',confidence:'Moderate',updated:'Moments ago',firstMile:'5 min walk → Metro',lastMile:'6 min walk → destination',steps:['Walk to Metro','Metro journey','Walk to destination'],geometry:geom,traffic:'Moderate'},
   {id:'r2',title:'Route 2',duration:28,cost:70,distance:8.6,walking:5,transfers:1,modes:['Auto / Rickshaw','Metro'],reason:'Quicker with lower walking, but more expensive.',context:'Demo transport context.',confidence:'Moderate',updated:'Moments ago',firstMile:'Auto pickup → Metro',lastMile:'5 min walk',steps:['Auto pickup','Metro journey','Final walk'],geometry:geom,traffic:'Heavy'},
