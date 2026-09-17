@@ -239,7 +239,26 @@ const buildRoute=async()=>{
       throw new Error('No routes returned');
     }
 
-    const connectivityResult=await checkSarthiConnectivity();
+    const connectivityResult=await checkSarthiConnectivity(); 
+    let weatherContext={
+  rain:0,
+  windSpeed:0
+};
+
+try{
+  const weatherResponse=await fetch(
+    `/api/context-intelligence?lat=${toCoords.lat}&lon=${toCoords.lng}&connectivity=${encodeURIComponent(connectivityResult.state)}&battery=80`
+  );
+
+  if(weatherResponse.ok){
+    const weatherData=await weatherResponse.json();
+
+    weatherContext={
+      rain:Number(weatherData.context?.weather?.rain)||0,
+      windSpeed:Number(weatherData.context?.weather?.windSpeed)||0
+    };
+  }
+}catch{}
 
     let battery=80;
 
