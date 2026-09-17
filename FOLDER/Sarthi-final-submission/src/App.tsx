@@ -12,7 +12,7 @@ import {
 import {
   checkSarthiConnectivity,
   ConnectivityState
-} from './utils/connectivity';
+} from './utils/conectivity';
 
 type Screen =
   | 'welcome'|'auth'|'phone'|'otp'|'location'|'language'|'disha-intro'|'profile'|'onboarding'|'home'
