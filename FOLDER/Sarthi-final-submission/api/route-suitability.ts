@@ -8,6 +8,8 @@ export default function handler(req: any, res: any) {
       connectivity = "Normal",
       battery = 80,
       helpPoints = 3,
+      rain = 0,
+      windSpeed = 0,
       priority = "balanced",
     } = req.query;
 
@@ -17,8 +19,9 @@ export default function handler(req: any, res: any) {
     const t = Number(transfers);
     const b = Number(battery);
     const h = Number(helpPoints);
+    const rainValue = Number(rain);
+    const wind = Number(windSpeed);
 
-    // Feature normalization
     const timeScore = Math.max(0, 1 - d / 120);
     const costScore = Math.max(0, 1 - c / 300);
     const walkingScore = Math.max(0, 1 - w / 60);
@@ -35,17 +38,20 @@ export default function handler(req: any, res: any) {
         ? 0.4
         : 0.2;
 
-    // ML-style learned feature weights
+    const weatherPenalty =
+      Math.min(0.35, rainValue * 0.15 + wind / 100);
+
     let score =
-      timeScore * 0.20 +
-      costScore * 0.15 +
+      timeScore * 0.18 +
+      costScore * 0.12 +
       walkingScore * 0.15 +
       transferScore * 0.10 +
       batteryScore * 0.10 +
       connectivityScore * 0.15 +
       helpScore * 0.15;
 
-    // User preference adjustment
+    score -= weatherPenalty;
+
     if (priority === "fastest") {
       score += timeScore * 0.10;
     }
@@ -69,23 +75,22 @@ export default function handler(req: any, res: any) {
           : score >= 0.55
           ? "Reasonable fit for the current journey context."
           : "Consider another available route.",
-      features: {
-        duration: d,
-        cost: c,
-        walking: w,
-        transfers: t,
-        connectivity,
-        battery: b,
-        helpPoints: h,
-        priority,
+      factors: {
+        timeScore: Number(timeScore.toFixed(2)),
+        costScore: Number(costScore.toFixed(2)),
+        walkingScore: Number(walkingScore.toFixed(2)),
+        connectivityScore: Number(connectivityScore.toFixed(2)),
+        batteryScore: Number(batteryScore.toFixed(2)),
+        helpScore: Number(helpScore.toFixed(2)),
+        weatherPenalty: Number(weatherPenalty.toFixed(2))
       },
-      model: "Sarthi Route Suitability Model v1",
-      generatedAt: new Date().toISOString(),
+      model: "Sarthi Context Suitability Model v2",
+      generatedAt: new Date().toISOString()
     });
   } catch {
     return res.status(500).json({
       success: false,
-      error: "Suitability calculation failed.",
+      error: "Suitability calculation failed."
     });
   }
 }
