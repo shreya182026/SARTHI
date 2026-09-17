@@ -198,7 +198,70 @@ useEffect(() => {
  useEffect(()=>{if(profile.completed)write('sarthi-profile',profile)},[profile]);
  const showLightBuzz=(reason:string)=>{setBuzz('light');toastMsg(`LIGHT BUZZ to ${contacts.filter(c=>c.primary).length} primary contact${contacts.filter(c=>c.primary).length===1?'':'s'}: ${reason}`)};
  const showTightBuzz=()=>{setBuzz('tight');toastMsg('TIGHT BUZZ / UEM: all contacts alerted with urgent context.')};
- const simulateUnexpectedStop=()=>{setStopState('checking');toastMsg('Your journey appears to have stopped. Are you okay?');window.setTimeout(()=>showLightBuzz('Unexpected stop remains unresolved in demo.'),2200);window.setTimeout(()=>{setStopState('escalated');showTightBuzz()},7000)};
+ const simulateUnexpectedStop=()=>{
+  const active=read<any>('sarthi-journey-capsule',null);
+  const journeyId=active?.journeyId||'active-journey';
+
+  setStopState('checking');
+
+  toastMsg('Your journey appears to have stopped. Are you okay?');
+
+  fetch('/api/uem-event',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      journeyId,
+      eventType:'UNEXPECTED_STOP',
+      latitude:livePos?.lat??null,
+      longitude:livePos?.lng??null,
+      battery,
+      connectivity,
+      lastCheckpoint:journeyStep,
+      destination:to
+    })
+  }).catch(()=>{});
+
+  window.setTimeout(()=>{
+    showLightBuzz('Unexpected stop remains unresolved.');
+
+    fetch('/api/uem-event',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        journeyId,
+        eventType:'CHECK_IN_NO_RESPONSE',
+        latitude:livePos?.lat??null,
+        longitude:livePos?.lng??null,
+        battery,
+        connectivity,
+        lastCheckpoint:journeyStep,
+        destination:to
+      })
+    }).catch(()=>{});
+
+  },2200);
+
+  window.setTimeout(()=>{
+    setStopState('escalated');
+    showTightBuzz();
+
+    fetch('/api/uem-event',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        journeyId,
+        eventType:'ESCALATION_REQUIRED',
+        latitude:livePos?.lat??null,
+        longitude:livePos?.lng??null,
+        battery,
+        connectivity,
+        lastCheckpoint:journeyStep,
+        destination:to
+      })
+    }).catch(()=>{});
+
+  },7000);
+};
  const sendSms=(kind:'light'|'tight'|'normal')=>{let msg='';const recipients=(kind==='normal'||kind==='light'?contacts.filter(c=>c.primary):contacts).map(c=>c.phone).filter(Boolean);const toList=recipients.join(',');const pointText=visiblePoints.length?visiblePoints.slice(0,8).map(p=>`${p.kind==='checkpoint'?'Checkpoint':'Help point'}: ${p.name} (${p.distanceKm.toFixed(1)} km)`).join(' | '):'Point data unavailable';if(kind==='normal')msg=`SARTHI JOURNEY STARTED
 Traveller: ${profile.name||'Traveller'}
 Start: ${from}
