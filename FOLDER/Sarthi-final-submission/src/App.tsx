@@ -9,6 +9,7 @@ import {
   AlertTriangle, Building2, Car, Bus, Bike, Moon, Sun, Play, MessageSquare, CloudRain, Smartphone,
   Map, Flag, Send, ChevronDown, LogOut, Sparkles, Plus
 } from 'lucide-react';
+import { checkSarthiConnectivity } from './utils/connectivity';
 
 type Screen =
   | 'welcome'|'auth'|'phone'|'otp'|'location'|'language'|'disha-intro'|'profile'|'onboarding'|'home'
