@@ -109,7 +109,32 @@ export default function App(){
  const openSample=()=>{setSampleStepNo(0);setBuzz('none');setSampleReturnScreen(screen);nav('sample')};
  const loadDemoAccount=()=>{setProfile(DEMO_PROFILE);setProfileDraft(DEMO_PROFILE);setPriorities(DEMO_PROFILE.priorities);setPhone(DEMO_PHONE);setContacts(DEMO_CONTACTS);write('sarthi-profile',DEMO_PROFILE);write('sarthi-contacts',DEMO_CONTACTS);write('sarthi-history',DEMO_HISTORY);setEditingProfile(false);setEditingPreferences(false);toastMsg('Demo profile loaded — Aarohi Sharma.');historyRef.current=['home'];historyIndexRef.current=0;setScreen('home')};
  const logout=()=>{setJourneyActive(false);setBuzz('none');localStorage.removeItem('sarthi-profile');localStorage.removeItem('sarthi-contacts');localStorage.removeItem('sarthi-history');localStorage.removeItem('sarthi-active');localStorage.removeItem('sarthi-journey-capsule');setProfile(DEFAULT_PROFILE);setProfileDraft(DEFAULT_PROFILE);setContacts([]);setPhone('');setOtp(['','','','','','']);setPriorities([]);historyRef.current=['welcome'];historyIndexRef.current=0;setScreen('welcome');toastMsg('You have been logged out. A new user can start fresh.')};
- const activateUem=()=>{showTightBuzz();setShowCancelCode(false);toastMsg('UEM activated. Every configured contact receives urgent journey context.');};
+ const activateUem=()=>{
+  const active=read<any>('sarthi-journey-capsule',null);
+  const journeyId=active?.journeyId||'active-journey';
+
+  showTightBuzz();
+  setShowCancelCode(false);
+
+  fetch('/api/uem-event',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      journeyId,
+      eventType:'ESCALATION_REQUIRED',
+      latitude:livePos?.lat??null,
+      longitude:livePos?.lng??null,
+      battery,
+      connectivity,
+      lastCheckpoint:journeyStep,
+      destination:to
+    })
+  }).catch(()=>{});
+
+  toastMsg(
+    'UEM activated. Every configured contact receives urgent journey context.'
+  );
+};
  const deactivateUem=()=>{if(buzz!=='tight'){activateUem();return}setShowCancelCode(true);};
  const PublicBack=()=> <button className="public-back" onClick={goBack}><ArrowLeft size={15}/> Back</button>;
  const toastMsg=(m:string)=>{setToast(m);window.setTimeout(()=>setToast(''),3200)};
