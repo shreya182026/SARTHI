@@ -551,7 +551,57 @@ try{
  const renderWelcome=()=> <div className="public welcome"><div className="hero-bg a"/><div className="hero-bg b"/><div className="welcome-brand"><Logo/></div><div className="welcome-center"><span className="eyebrow">A JOURNEY COMPANION FOR REAL-WORLD TRAVEL</span><h1>Find the journey that <em>fits the moment.</em></h1><p>Not just where to go — Sarthi helps you understand how today’s journey fits your situation and stays with you when things change.</p><button className="hero-cta" onClick={()=>nav('auth')}>Get Started <ArrowRight size={19}/></button></div></div>;
  const renderAuth=()=> <div className="public auth-page"><PublicBack/><div className="auth-intro"><Logo/><h1>Welcome to Sarthi</h1><p>Choose how you want to enter. I recommend <b>Sign Up</b> so your travel style, trusted contacts and journey history can be remembered.</p></div><div className="auth-list"><button className="auth-card featured" onClick={()=>{localStorage.removeItem('sarthi-profile');localStorage.removeItem('sarthi-contacts');localStorage.removeItem('sarthi-history');localStorage.removeItem('sarthi-active');setProfile(DEFAULT_PROFILE);setProfileDraft(DEFAULT_PROFILE);setContacts([]);setPriorities([]);setPhone('');setOtp(['','','','','','']);setEditingProfile(false);setEditingPreferences(false);nav('phone')}}><div className="auth-dot pink"><User/></div><div><b>Sign Up</b><span>Recommended — remember your preferences, contacts and journeys.</span></div><ChevronRight/></button><button className="auth-card" onClick={()=>nav('phone')}><div className="auth-dot navy"><LogOut/></div><div><b>Log In</b><span>Return to your saved Sarthi profile.</span></div><ChevronRight/></button><button className="auth-card" onClick={()=>{setProfile(u=>({...u,phone:'',isGuest:true}));nav('journey-type')}}><div className="auth-dot turq"><Compass/></div><div><b>Guest Mode</b><span>Plan and try the core journey flow without permanent history.</span></div><ChevronRight/></button></div><div className="demo-card"><Play size={17}/><div><b>See the complete sample journey</b><span>One guided demo of the full Sarthi journey.</span></div><button onClick={openSample}>Play sample</button></div></div>;
  const renderPhone=()=> <div className="auth-page simple"><PublicBack/><div className="progress"><span className="on"/><span/><span/><span/></div><Logo small/><h1>{screen==='phone'?'Your phone, then one quick OTP.':'Your phone number'}</h1><p className="lead">For today’s demo, you can enter 9876543210. In the real app this step connects to secure authentication.</p><Bubble text="I’ll only ask for your phone here. The next screen is the OTP — no long form on one page."/><div className="card form"><label>Mobile number <InfoBtn text="Your number is used to identify your login session. Real deployment will use a secure authentication service."/></label><div className="phone-row"><span>+91</span><input inputMode="numeric" maxLength={10} value={phone.replace(/\D/g,'').slice(0,10)} onChange={e=>setPhone(e.target.value.replace(/\D/g,'').slice(0,10))}/></div><small>Demo: 9876543210</small></div><button className="primary pink" disabled={phone.replace(/\D/g,'').length!==10} onClick={()=>nav('otp')}>Continue <ArrowRight/></button></div>;
- const renderOtp=()=> <div className="auth-page simple"><PublicBack/><div className="progress"><span className="on"/><span className="on"/><span/><span/></div><Logo small/><h1>Enter your OTP</h1><p className="lead">We sent a 6-digit code to +91 ••••••{phone.slice(-2)}.</p><Bubble text="For today’s demo, use 123456. I’ll move you forward only when all six digits match."/><div className="card form"><div className="otp-row">{otp.map((v,i)=><input key={i} ref={el=>otpRef[i]=el} autoFocus={i===0} maxLength={1} inputMode="numeric" value={v} onChange={e=>{const val=e.target.value.replace(/\D/g,'').slice(-1);const n=[...otp];n[i]=val;setOtp(n);if(val&&i<5)otpRef[i+1]?.focus()}} onKeyDown={e=>{if(e.key==='Backspace'&&!otp[i]&&i>0)otpRef[i-1]?.focus()}}/> )}</div><button className="demo-otp" onClick={()=>setOtp(['1','2','3','4','5','6'])}>Use demo OTP 123456</button><span className="muted">Resend OTP · Change number</span></div><button className="primary pink" onClick={()=>{if(otp.join('')!=='123456'){toastMsg('Please enter the demo OTP 123456.');return}if(phone.replace(/\D/g,'')===DEMO_PHONE){loadDemoAccount();return}setProfile(p=>({...p,phone:phone.replace(/\D/g,'')}));nav('location')}}>Verify & Continue <Check/></button></div>;
+ const renderOtp=()=> <div className="auth-page simple"><PublicBack/><div className="progress"><span className="on"/><span className="on"/><span/><span/></div><Logo small/><h1>Enter your OTP</h1><p className="lead">We sent a 6-digit code to +91 ••••••{phone.slice(-2)}.</p><Bubble text="For today’s demo, use 123456. I’ll move you forward only when all six digits match."/><div className="card form"><div className="otp-row">{otp.map((v,i)=><input key={i} ref={el=>otpRef[i]=el} autoFocus={i===0} maxLength={1} inputMode="numeric" value={v} onChange={e=>{const val=e.target.value.replace(/\D/g,'').slice(-1);const n=[...otp];n[i]=val;setOtp(n);if(val&&i<5)otpRef[i+1]?.focus()}} onKeyDown={e=>{if(e.key==='Backspace'&&!otp[i]&&i>0)otpRef[i-1]?.focus()}}/> )}</div><button className="demo-otp" onClick={()=>setOtp(['1','2','3','4','5','6'])}>Use demo OTP 123456</button><span className="muted">Resend OTP · Change number</span></div><button
+  className="primary pink"
+  onClick={async () => {
+    const active = read<any>('sarthi-journey-capsule', null);
+
+    try {
+      await fetch('/api/journey-event', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          journeyId: active?.journeyId || 'active-journey',
+          eventType: 'JOURNEY_COMPLETED',
+          latitude: livePos?.lat ?? null,
+          longitude: livePos?.lng ?? null,
+          battery,
+          connectivity,
+          checkpoint: journeyStep,
+          destination: to
+        })
+      });
+    } catch {}
+
+    const h = read<any[]>('sarthi-history', []);
+
+    h.unshift({
+      date: new Date().toISOString(),
+      from,
+      to,
+      route: selected?.title || 'Route 1',
+      mode: selected?.modes.join(' + '),
+      duration: selected?.duration || 32,
+      cost: selected?.cost || 40,
+      walking: selected?.walking || 7,
+      events: ['Journey Capsule prepared', 'Journey completed'],
+      checkpoints: visiblePoints.filter(m => m.kind === 'checkpoint'),
+      helpPoints: visiblePoints.filter(m => m.kind === 'help'),
+      battery,
+      connectivity,
+      geometry: selected?.geometry || []
+    });
+
+    write('sarthi-history', h);
+    write('sarthi-active', null);
+    setJourneyActive(false);
+    nav('my-journeys');
+  }}
+>
+  Save to My Journeys <CalendarDays />
+</button></div>;
  const renderLocation=()=> <div className="auth-page simple"><PublicBack/><Logo small/><h1>Let’s connect your location</h1><p className="lead">First I’ll understand roughly where you are. This lets Sarthi personalize language choices and later support an active journey.</p><Bubble text="Your live location is not shared just because you allow location access. Live journey sharing starts only after you start a journey."/><div className="card location-card"><LocateFixed size={24}/><div><b>{location?'Location connected':'Location not connected'}</b><span>{locationText}</span></div><button className="secondary turq" onClick={requestLocation}>{location?'Refresh':'Allow location'}</button></div><div className="privacy-note"><Shield size={16}/><span>Live location is used only during an active journey.</span></div><button className="primary turq" onClick={()=>{setRecommended(['en','hi','mr']);nav('language')}}>Continue <ArrowRight/></button></div>;
  const renderLanguage=()=> <div className="auth-page simple"><PublicBack/><Logo small/><h1>Choose the language that feels natural</h1><p className="lead">Likely choices are shown first. Your selected language changes the app’s user-facing text.</p><Bubble text="You can change this later in Settings. I’ll keep the same journey logic underneath."/><div className="card"><div className="section-title">Recommended for you</div><div className="lang-grid">{recommended.map(c=>{const l=LANGS.find(x=>x.code===c)!;return <button className={language===c?'selected':''} key={c} onClick={()=>setLanguage(c)}><span>Recommended</span><b>{l.native}</b><small>{l.english}</small></button>})}</div><button className="other" onClick={()=>setShowAllLang(v=>!v)}><Languages/> All languages <ChevronDown/></button>{showAllLang&&<div className="lang-grid all">{LANGS.filter(l=>!recommended.includes(l.code)).map(l=><button className={language===l.code?'selected':''} key={l.code} onClick={()=>setLanguage(l.code)}><b>{l.native}</b><small>{l.english}</small></button>)}</div>}</div><button className="primary pink" onClick={()=>{write('sarthi-language',language);profile.completed?goBack():nav('disha-intro')}}>Continue <ArrowRight/></button></div>;
  const renderDishaIntro=()=> <div className="auth-page simple"><div className="disha-hero"><Disha size={118}/></div><span className="eyebrow">MEET YOUR AI GUIDE</span><h1>Hi, I’m <em>Disha.</em></h1><p className="lead">I’m not here to make decisions for you. I’m here to explain your choices, help you prepare, and stay with you when the journey changes.</p><div className="disha-points card"><div><Check/> I explain why I ask.</div><div><Check/> I remember your usual travel style.</div><div><Check/> I show uncertainty instead of pretending.</div><div><Check/> I guide you through emergency and offline support.</div></div><button className="primary pink" onClick={()=>nav('profile')}>Let’s get to know you <ArrowRight/></button></div>;
