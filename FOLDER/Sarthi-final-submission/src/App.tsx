@@ -225,7 +225,9 @@ const buildRoute=async()=>{
       to:`${toCoords.lat},${toCoords.lng}`
     });
 
-    const response=await fetch(`/api/route-intelligence?${params.toString()}`);
+    const response=await fetch(
+      `/api/route-intelligence?${params.toString()}`
+    );
 
     if(!response.ok){
       throw new Error('Route backend unavailable');
@@ -237,41 +239,96 @@ const buildRoute=async()=>{
       throw new Error('No routes returned');
     }
 
-    const rts:Route[]=data.routes.map((route:any,index:number)=>{
+    const connectivityResult=await checkSarthiConnectivity();
 
-      const geometry:[number,number][]=
-        route.geometry?.coordinates?.map(
-          ([lng,lat]:[number,number])=>[lat,lng] as [number,number]
-        )||[];
+    let battery=80;
 
-      const mode=index===0
-        ? ['Driving']
-        : ['Alternative driving'];
+    try{
+      const batteryManager=await (navigator as any).getBattery?.();
 
-      return {
-        id:`backend-${route.id||index+1}`,
-        title:`Route ${index+1}`,
-        duration:route.durationMin||0,
-        cost:route.estimatedCost||0,
-        distance:route.distanceKm||0,
-        walking:0,
-        transfers:0,
-        modes:mode,
-        reason:index===0
-          ? 'Real route calculated from your selected journey.'
-          : 'Alternative real road route returned by the routing service.',
-        context:'Route calculated using live OpenStreetMap/OSRM routing data.',
-        confidence:'High',
-        updated:'Just now',
-        firstMile:'Based on the selected starting point',
-        lastMile:'Based on the selected destination',
-        steps:(route.steps||[])
-          .slice(0,8)
-          .map((s:any)=>s.name||s.maneuver?.type||'Continue'),
-        geometry,
-        traffic:'Moderate'
-      };
-    });
+      if(batteryManager){
+        battery=Math.round(batteryManager.level*100);
+      }
+    }catch{}
+
+    const rts:Route[]=await Promise.all(
+      data.routes.map(async(route:any,index:number)=>{
+
+        const geometry:[number,number][]=
+          route.geometry?.coordinates?.map(
+            ([lng,lat]:[number,number])=>[lat,lng] as [number,number]
+          )||[];
+
+        const duration=route.durationMin||0;
+        const cost=route.estimatedCost||0;
+        const distance=route.distanceKm||0;
+
+        let suitabilityScore=0.5;
+        let suitabilityText='Context analysis unavailable.';
+
+        try{
+          const suitabilityParams=new URLSearchParams({
+            duration:String(duration),
+            cost:String(cost),
+            walking:'0',
+            transfers:'0',
+            connectivity:connectivityResult.state,
+            battery:String(battery),
+            helpPoints:'3',
+            priority:'balanced'
+          });
+
+          const suitabilityResponse=await fetch(
+            `/api/route-suitability?${suitabilityParams.toString()}`
+          );
+
+          if(suitabilityResponse.ok){
+            const suitabilityData=await suitabilityResponse.json();
+
+            if(suitabilityData.success){
+              suitabilityScore=
+                Number(suitabilityData.suitabilityScore)||0.5;
+
+              suitabilityText=
+                suitabilityData.recommendation||
+                suitabilityText;
+            }
+          }
+        }catch{}
+
+        return {
+          id:`backend-${route.id||index+1}`,
+          title:`Route ${index+1}`,
+          duration,
+          cost,
+          distance,
+          walking:0,
+          transfers:0,
+          modes:['Driving'],
+          reason:
+            index===0
+              ? `${suitabilityText} Suitability: ${Math.round(suitabilityScore*100)}%.`
+              : `Alternative route. Suitability: ${Math.round(suitabilityScore*100)}%.`,
+          context:
+            `Live route data + connectivity (${connectivityResult.state}) + battery (${battery}%).`,
+          confidence:'Moderate',
+          updated:'Just now',
+          firstMile:'Based on the selected starting point',
+          lastMile:'Based on the selected destination',
+          steps:(route.steps||[])
+            .slice(0,8)
+            .map(
+              (s:any)=>
+                s.name||
+                s.maneuver?.instruction||
+                s.maneuver?.type||
+                'Continue'
+            ),
+          geometry,
+          traffic:'Moderate'
+        };
+      })
+    );
 
     setRoutes(rts);
     setSelectedRoute(0);
