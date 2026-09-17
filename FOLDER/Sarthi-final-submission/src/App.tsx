@@ -9,7 +9,10 @@ import {
   AlertTriangle, Building2, Car, Bus, Bike, Moon, Sun, Play, MessageSquare, CloudRain, Smartphone,
   Map, Flag, Send, ChevronDown, LogOut, Sparkles, Plus
 } from 'lucide-react';
-import { checkSarthiConnectivity } from './utils/connectivity';
+import {
+  checkSarthiConnectivity,
+  ConnectivityState
+} from './utils/connectivity';
 
 type Screen =
   | 'welcome'|'auth'|'phone'|'otp'|'location'|'language'|'disha-intro'|'profile'|'onboarding'|'home'
@@ -88,7 +91,8 @@ export default function App(){
  const [routes,setRoutes]=useState<Route[]>([]); const [selectedRoute,setSelectedRoute]=useState(0); const [loadingRoutes,setLoadingRoutes]=useState(false);
  const [livePos,setLivePos]=useState<Coords|null>(location); const [journeyStep,setJourneyStep]=useState(0); const [battery,setBattery]=useState(74); const [connectivity,setConnectivity]=useState<'Normal'|'Unstable'|'Low connectivity'|'Offline'>('Normal');
  const [lastSync,setLastSync]=useState(new Date().toLocaleTimeString()); const [journeyActive,setJourneyActive]=useState(false); const [buzz,setBuzz]=useState<'none'|'light'|'tight'>('none'); const [demoPlaying,setDemoPlaying]=useState(false); const [stopState,setStopState]=useState<'moving'|'checking'|'escalated'>('moving');
- const [toast,setToast]=useState(''); const [reportText,setReportText]=useState(''); const [reportStatus,setReportStatus]=useState<'Under Review'|'Verified'|'Questionable'|'Outdated'>('Under Review'); const evidenceInputRef=useRef<HTMLInputElement|null>(null); const [evidencePhoto,setEvidencePhoto]=useState('');
+ const [toast,setToast]=useState(''); const [connectivityLatency,setConnectivityLatency]=useState<number|null>(null);
+const connectivityNoticeRef=useRef<ConnectivityState|null>(null); const [reportText,setReportText]=useState(''); const [reportStatus,setReportStatus]=useState<'Under Review'|'Verified'|'Questionable'|'Outdated'>('Under Review'); const evidenceInputRef=useRef<HTMLInputElement|null>(null); const [evidencePhoto,setEvidencePhoto]=useState('');
  const [contacts,setContacts]=useState<Contact[]>(read<Contact[]>('sarthi-contacts',[]));
  const [contactsSetup,setContactsSetup]=useState(false);
  const [pointStatus,setPointStatus]=useState<'idle'|'loading'|'live'|'fallback'>('idle'); const [pointUpdatedAt,setPointUpdatedAt]=useState('');
@@ -114,7 +118,64 @@ export default function App(){
  const toastMsg=(m:string)=>{setToast(m);window.setTimeout(()=>setToast(''),3200)};
  const requestLocation=()=>{if(!navigator.geolocation){toastMsg('Location is not available in this browser.');return} navigator.geolocation.getCurrentPosition(async p=>{const c={lat:p.coords.latitude,lng:p.coords.longitude};setLocation(c);setLivePos(c);setFromCoords(c);write('sarthi-location',c);setLocationText(`${c.lat.toFixed(4)}, ${c.lng.toFixed(4)}`);try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${c.lat}&lon=${c.lng}&zoom=10`,{headers:{Accept:'application/json'}});const j=await r.json();const st=j?.address?.state||'Your state';setStateName(st);const map:Record<string,string>={'Delhi':'181','NCT of Delhi':'181','Haryana':'181','Maharashtra':'181','Gujarat':'181'};setHelpline(map[st]||'181'); try{const w=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${c.lat}&longitude=${c.lng}&current=temperature_2m,precipitation,weather_code&forecast_days=1`); const wj=await w.json(); const code=Number(wj?.current?.weather_code??0); const label=code===0?'Clear':code<60?'Cloudy / partly cloudy':code<80?'Rain possible':'Unsettled weather'; setWeather({label,temp:`${Math.round(wj?.current?.temperature_2m??0)}°C`,rain:`${wj?.current?.precipitation??0} mm`})}catch{} setLocationText(j?.display_name||`${c.lat.toFixed(4)}, ${c.lng.toFixed(4)}`);write('sarthi-location-text',j?.display_name||`${c.lat.toFixed(4)}, ${c.lng.toFixed(4)}`)}catch{}},()=>toastMsg('Location access was not granted. You can continue with demo data.'),{enableHighAccuracy:true,timeout:10000,maximumAge:10000})};
  useEffect(()=>{if(!journeyActive||!navigator.geolocation)return;const id=navigator.geolocation.watchPosition(p=>{const c={lat:p.coords.latitude,lng:p.coords.longitude};setLivePos(c);setLastSync(new Date().toLocaleTimeString())},()=>{} ,{enableHighAccuracy:true,maximumAge:5000,timeout:10000});return()=>navigator.geolocation.clearWatch(id)},[journeyActive]);
- useEffect(()=>{const handler=()=>{if(navigator.onLine){if(connectivity==='Offline'||connectivity==='Low connectivity')toastMsg('Connection restored — Journey synced.');setConnectivity('Normal');setLastSync(new Date().toLocaleTimeString())}else{setConnectivity('Offline');toastMsg('We have gone offline. Your essential journey is still available.') }};window.addEventListener('online',handler);window.addEventListener('offline',handler);return()=>{window.removeEventListener('online',handler);window.removeEventListener('offline',handler)}},[connectivity]);
+useEffect(() => {
+  let cancelled = false;
+
+  const check = async () => {
+    const result = await checkSarthiConnectivity();
+
+    if (cancelled) return;
+
+    setConnectivityLatency(result.latency);
+
+    setConnectivity(prev => {
+      if (prev !== result.state) {
+        if (result.state === 'Normal' && prev !== 'Normal') {
+          toastMsg('Connection restored — Sarthi is synced.');
+          setLastSync(new Date().toLocaleTimeString());
+        }
+
+        if (result.state === 'Unstable') {
+          toastMsg('Connectivity is unstable. Sarthi is preparing fallback support.');
+        }
+
+        if (result.state === 'Low connectivity') {
+          toastMsg('Low connectivity detected. Essential journey support stays available.');
+        }
+
+        if (result.state === 'Offline') {
+          toastMsg('We are offline. Your Journey Capsule remains available.');
+        }
+      }
+
+      return result.state;
+    });
+
+    if (result.state === 'Normal') {
+      setLastSync(new Date().toLocaleTimeString());
+    }
+  };
+
+  check();
+
+  const interval = window.setInterval(check, 15000);
+
+  const handleOnline = () => check();
+  const handleOffline = () => {
+    setConnectivity('Offline');
+    setConnectivityLatency(null);
+  };
+
+  window.addEventListener('online', handleOnline);
+  window.addEventListener('offline', handleOffline);
+
+  return () => {
+    cancelled = true;
+    window.clearInterval(interval);
+    window.removeEventListener('online', handleOnline);
+    window.removeEventListener('offline', handleOffline);
+  };
+}, []);
  useEffect(()=>{if(screen==='live'){if(battery<=40&&battery>20)toastMsg('40%: Low-Power Journey Mode prepared.'); if(battery===20)showLightBuzz('Battery is at 20%.'); if(battery===10)showLightBuzz('Battery has reached 10%.'); if(battery<=5)toastMsg('Critical Low Battery Mode — essential support only.')}},[battery,screen]);
  useEffect(()=>{if(profile.completed)write('sarthi-profile',profile)},[profile]);
  const showLightBuzz=(reason:string)=>{setBuzz('light');toastMsg(`LIGHT BUZZ to ${contacts.filter(c=>c.primary).length} primary contact${contacts.filter(c=>c.primary).length===1?'':'s'}: ${reason}`)};
