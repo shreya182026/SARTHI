@@ -124,6 +124,27 @@ useEffect(() => {
     if (cancelled) return;
 
     setConnectivityLatency(result.latency);
+    if(journeyActive){
+  try{
+    const active=read<any>('sarthi-journey-capsule',null);
+
+    await fetch('/api/journey-event',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify({
+        journeyId:active?.journeyId||'active-journey',
+        eventType:'CONNECTIVITY_CHANGED',
+        latitude:livePos?.lat??null,
+        longitude:livePos?.lng??null,
+        battery,
+        connectivity:result.state,
+        checkpoint:null
+      })
+    });
+  }catch{}
+}
 
     setConnectivity(prev => {
       if (prev !== result.state) {
