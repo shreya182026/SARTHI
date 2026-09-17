@@ -326,12 +326,12 @@ try{
           walking:0,
           transfers:0,
           modes:['Driving'],
-          reason:
-            index===0
-              ? `${suitabilityText} Suitability: ${Math.round(suitabilityScore*100)}%.`
-              : `Alternative route. Suitability: ${Math.round(suitabilityScore*100)}%.`,
+         reason:
+  index===0
+    ? `${suitabilityText} Sarthi considered travel time, connectivity, battery, weather and available assistance.`
+    : `${suitabilityText} Sarthi compared this option against the current journey context.`,
           context:
-            `Live route data + connectivity (${connectivityResult.state}) + battery (${battery}%).`,
+             `Live route data | Connectivity: ${connectivityResult.state} | Battery: ${battery}% | Rain: ${weatherContext.rain} mm | Wind: ${weatherContext.windSpeed} km/h`,
           confidence:'Moderate',
           updated:'Just now',
           firstMile:'Based on the selected starting point',
