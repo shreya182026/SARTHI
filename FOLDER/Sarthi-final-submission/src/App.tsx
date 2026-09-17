@@ -366,7 +366,58 @@ try{
   {id:'r1',title:'Route 1',duration:32,cost:40,distance:9.2,walking:7,transfers:1,modes:['Walk','Metro'],reason:'Currently fits your saved priorities well.',context:'Demo road/transit context used because live routing is unavailable.',confidence:'Moderate',updated:'Moments ago',firstMile:'5 min walk → Metro',lastMile:'6 min walk → destination',steps:['Walk to Metro','Metro journey','Walk to destination'],geometry:geom,traffic:'Moderate'},
   {id:'r2',title:'Route 2',duration:28,cost:70,distance:8.6,walking:5,transfers:1,modes:['Auto / Rickshaw','Metro'],reason:'Quicker with lower walking, but more expensive.',context:'Demo transport context.',confidence:'Moderate',updated:'Moments ago',firstMile:'Auto pickup → Metro',lastMile:'5 min walk',steps:['Auto pickup','Metro journey','Final walk'],geometry:geom,traffic:'Heavy'},
   {id:'r3',title:'Route 3',duration:31,cost:180,distance:9.4,walking:2,transfers:0,modes:['Cab'],reason:'Minimal walking and no transfer.',context:'Cab integration is represented with demo data.',confidence:'Limited',updated:'Moments ago',firstMile:'Cab pickup',lastMile:'Drop-off',steps:['Cab pickup','Direct ride','Drop-off'],geometry:geom,traffic:'Light'}]};
- const startJourney=()=>{const c=fromCoords||location||{lat:28.6139,lng:77.209};const capsule={startedAt:new Date().toISOString(),route:selected?.title||'Route 1',from,to,mode:selected?.modes||[selectedMode],geometry:selected?.geometry||[],steps:selected?.steps||[],checkpoints:visiblePoints.filter(m=>m.kind==='checkpoint'),helpPoints:visiblePoints.filter(m=>m.kind==='help'),destination:to,contacts,helpline,stateName,lastSync};setJourneyActive(true);setLivePos(c);setBattery(74);setConnectivity(navigator.onLine?'Normal':'Offline');setStopState('moving');write('sarthi-active',capsule);write('sarthi-journey-capsule',capsule);nav('live');};
+ const startJourney=async()=>{
+  const c=fromCoords||location||{lat:28.6139,lng:77.209};
+
+  const journeyId=`journey-${Date.now()}`;
+
+  const capsule={
+    journeyId,
+    startedAt:new Date().toISOString(),
+    route:selected?.title||'Route 1',
+    from,
+    to,
+    mode:selected?.modes||[selectedMode],
+    geometry:selected?.geometry||[],
+    steps:selected?.steps||[],
+    checkpoints:visiblePoints.filter(m=>m.kind==='checkpoint'),
+    helpPoints:visiblePoints.filter(m=>m.kind==='help'),
+    destination:to,
+    contacts,
+    helpline,
+    stateName,
+    lastSync
+  };
+
+  setJourneyActive(true);
+  setLivePos(c);
+  setBattery(74);
+  setConnectivity(navigator.onLine?'Normal':'Offline');
+  setStopState('moving');
+
+  write('sarthi-active',capsule);
+  write('sarthi-journey-capsule',capsule);
+
+  try{
+    await fetch('/api/journey-event',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify({
+        journeyId,
+        eventType:'JOURNEY_STARTED',
+        latitude:c.lat,
+        longitude:c.lng,
+        battery:74,
+        connectivity:navigator.onLine?'Normal':'Offline',
+        checkpoint:null
+      })
+    });
+  }catch{}
+
+  nav('live');
+};const capsule={startedAt:new Date().toISOString(),route:selected?.title||'Route 1',from,to,mode:selected?.modes||[selectedMode],geometry:selected?.geometry||[],steps:selected?.steps||[],checkpoints:visiblePoints.filter(m=>m.kind==='checkpoint'),helpPoints:visiblePoints.filter(m=>m.kind==='help'),destination:to,contacts,helpline,stateName,lastSync};setJourneyActive(true);setLivePos(c);setBattery(74);setConnectivity(navigator.onLine?'Normal':'Offline');setStopState('moving');write('sarthi-active',capsule);write('sarthi-journey-capsule',capsule);nav('live');};
  const finishProfile=()=>{if(editingProfile){const p={...profileDraft,completed:true,phone};setProfile(p);write('sarthi-profile',p);setEditingProfile(false);toastMsg('Profile updated. Your usual travel style is saved.');goBack()}else{const p={...profileDraft,completed:false,phone,priorities:[]};setProfile(p);setPriorities([]);write('sarthi-profile',p);nav('onboarding-preferences')}};
  const finishOnboardingPreferences=()=>{if(priorities.length<6){toastMsg('Choose at least 6 priorities so I can understand what matters to you.');return}const p={...profile,priorities,completed:false};setProfile(p);write('sarthi-profile',p);setContactsSetup(true);nav('contacts')};
  const finishOnboarding=()=>{const p={...profile,completed:true};setProfile(p);write('sarthi-profile',p);historyRef.current=['home'];historyIndexRef.current=0;setScreen('home');window.scrollTo({top:0,behavior:'smooth'})};
