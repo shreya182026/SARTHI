@@ -287,14 +287,16 @@ try{
 
         try{
           const suitabilityParams=new URLSearchParams({
-            duration:String(duration),
-            cost:String(cost),
-            walking:'0',
-            transfers:'0',
-            connectivity:connectivityResult.state,
-            battery:String(battery),
-            helpPoints:'3',
-            priority:'balanced'
+           duration:String(duration),
+  cost:String(cost),
+  walking:'0',
+  transfers:'0',
+  connectivity:connectivityResult.state,
+  battery:String(battery),
+  helpPoints:'3',
+  rain:String(weatherContext.rain),
+  windSpeed:String(weatherContext.windSpeed),
+  priority:'balanced'
           });
 
           const suitabilityResponse=await fetch(
